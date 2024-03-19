@@ -19,6 +19,7 @@
     <version>5.6.10</version>
 </dependency>
 5.6.x 版本 java doc 官方地址:https://www.elastic.co/guide/en/elasticsearch/reference/5.6/install-elasticsearch.html
+需要注意的是目前transport6.x版本不兼容9300连接端口.并且5.5版本链接出现NoNodeAvailableException问题.故这里选用了这个版本进行transport client 链接.
 ```
 >引用:按照目前elasticsearch的规划,会在Elasticsearch7.0版本deprecating该transport形式连接.Elasticsearch8.0版本完成完整的丢弃.转而使用HTTP Restful的形式api.
 >参见:https://www.elastic.co/guide/en/elasticsearch/client/java-api/5.6/java-api.html
