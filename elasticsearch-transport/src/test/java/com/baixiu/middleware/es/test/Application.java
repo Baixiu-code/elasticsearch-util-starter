@@ -1,4 +1,4 @@
-package com.baixiu.middleware.spi.test;
+package com.baixiu.middleware.es.test;
 
 import org.springframework.beans.BeansException;
 import org.springframework.boot.SpringApplication;

@@ -1,4 +1,4 @@
-package com.jd.rc.core.trade.product.api.common;
+package com.baixiu.middleware.elasticsearch.page;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

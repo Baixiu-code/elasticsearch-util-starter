@@ -1,25 +1,15 @@
-package com.jd.rd.product.domain.biz.service.search.service;
+package com.baixiu.middleware.elasticsearch.api;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
+import com.baixiu.middleware.elasticsearch.order.OrderBy;
+import com.baixiu.middleware.elasticsearch.page.*;
+import com.baixiu.middleware.elasticsearch.transport.ElasticSearchTemplate;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.jd.fastjson.JSON;
-import com.jd.jsf.gd.util.Constants;
-import com.jd.jsf.gd.util.JsonUtils;
-import com.jd.jsf.gd.util.RpcContext;
-import com.jd.jsf.gd.util.StringUtils;
-import com.jd.rd.product.domain.common.TemplateRouteRequest;
-import com.jd.rc.core.trade.product.api.common.JoinLogic;
-import com.jd.rc.core.trade.product.api.common.OrderBy;
-import com.jd.rc.core.trade.product.api.common.page.Page;
-import com.jd.rc.core.trade.product.api.common.page.PageRequest;
-import com.jd.rc.core.trade.product.api.common.page.ScrollPage;
-import com.jd.rc.core.trade.product.api.common.page.ScrollPageRequest;
-import com.jd.rd.product.infrastructure.es.ESTemplate;
-import com.xstore.commons.exception.BadArgumentException;
-import com.xstore.commons.exception.SystemException;
 import lombok.extern.slf4j.Slf4j;
-import net.sf.json.util.JSONUtils;
+import org.apache.commons.lang.StringUtils;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.search.SearchPhaseExecutionException;
 import org.elasticsearch.action.search.SearchRequestBuilder;
@@ -36,16 +26,9 @@ import org.elasticsearch.search.collapse.CollapseBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
-import org.springframework.util.CollectionUtils;
 import java.lang.reflect.ParameterizedType;
 import java.math.BigDecimal;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Stack;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -54,7 +37,7 @@ import java.util.stream.Collectors;
  * @date  2020/11/12
  */
 @Slf4j
-public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T> {
+public abstract class AbstractTransportSearchIndexService<S, T> implements TransportSearchIndexService<S, T> {
 
     public static String defaultRouting = "0";
     public static final int DEFAULT_PAGE_MAX_DEEP = 10000;
@@ -64,54 +47,14 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
     private String typeForSix;
     private String type;
 
-    ESTemplate esTemplateForSix;
+    private ElasticSearchTemplate elasticSearchTemplate;
 
+   
 
-
-    @Override
-    public Page<T> search(Long tenantId, S searchBean, PageRequest pageRequest, List<OrderBy> order
-            , TemplateRouteRequest sceneRequest) {
-        try {
-            return search(tenantId, searchBean, pageRequest, order, true);
-        } catch (Exception e) {
-            if(e instanceof SearchPhaseExecutionException){
-                log.info("search.SearchPhaseExecutionException.noBizError.{}.{}",tenantId,e.getMessage());
-                return null;
-            }
-            if(e instanceof BadArgumentException){
-                log.info("search.BadArgumentException.noBizError.{}.{}",tenantId,e.getMessage());
-                return null;
-            }
-            log.error("search.Error.{}.{}.{}.{}.{}", tenantId, JSONUtils.valueToString(searchBean)
-                    , JSONUtils.valueToString(pageRequest), JSONUtils.valueToString(order)
-                    , JSONUtils.valueToString(sceneRequest), e);
-            return null;
-
-        }
-    }
+   
 
     @Override
-    public ScrollPage<T> scrollSearch(Long tenantId, S searchBean, ScrollPageRequest pageRequest,TemplateRouteRequest sceneRequest) {
-        try {
-            return scrollSearch(tenantId, searchBean, pageRequest, true);
-        } catch (Exception e) {
-            if(e instanceof SearchPhaseExecutionException){
-                log.info("scrollSearch.SearchPhaseExecutionException.noBizError.{}.{}",tenantId,e.getMessage());
-                return null;
-            }
-            if(e instanceof BadArgumentException){
-                log.info("scrollSearch.BadArgumentException.noBizError.{}.{}",tenantId,e.getMessage());
-                return null;
-            }
-            log.error("scrollSearchError.{}.{}.{}.{}.{}", tenantId, JSONUtils.valueToString(searchBean)
-                    , JSONUtils.valueToString(pageRequest),JSONUtils.valueToString(sceneRequest), e);
-            return null;
-        }
-
-    }
-
-    @Override
-    public Page<T> search(Long tenantId, S searchBean, PageRequest pageRequest, List<OrderBy> order, Boolean isGoToJes) {
+    public Page<T> search(Long tenantId, S searchBean, PageRequest pageRequest, List<OrderBy> order) {
 
         Page<T> returnPage = new Page<T>();
         returnPage.setPage(pageRequest.getPage());
@@ -125,11 +68,11 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
         // 控制分页深度
         if (from + pageRequest.getPageSize() > DEFAULT_PAGE_MAX_DEEP) {
             log.info("最多查询[" + DEFAULT_PAGE_MAX_DEEP + "]条数据，请增加查询条件过滤结果集");
-            throw new BadArgumentException("最多查询[" + DEFAULT_PAGE_MAX_DEEP + "]条数据，请增加查询条件过滤结果集");
+            throw new RuntimeException ("最多查询[" + DEFAULT_PAGE_MAX_DEEP + "]条数据，请增加查询条件过滤结果集");
         }
 
 
-        SearchRequestBuilder srb = getSearchRequestBuilderBySwitch(isGoToJes).setFrom(from)
+        SearchRequestBuilder srb = getSearchRequestBuilderBySwitch().setFrom(from)
                 .setSize(pageRequest.getPageSize())
                 .setQuery(getQueryBuilder(searchBean));
         String[] routing = getRouting4Search(searchBean);
@@ -138,13 +81,11 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
         }
         srb.addSort(SortBuilders.scoreSort().order(SortOrder.DESC));
         // 构建排序
-        if (!CollectionUtils.isEmpty(order)) {
-            for (OrderBy searchOrder : order) {
-                if (null == searchOrder) {
-                    continue;
-                }
-                srb.addSort(searchOrder.getField(), getSortOrder(searchOrder));
+        for (OrderBy searchOrder : order) {
+            if (null == searchOrder) {
+                continue;
             }
+            srb.addSort(searchOrder.getField(), getSortOrder(searchOrder));
         }
         log.info("EsAbstractIndexService.SearchRequestBuilder:{}", srb);
 
@@ -156,12 +97,12 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
                 log.info("searchMultiError.SearchPhaseExecutionException.noBizError.{}.{}",tenantId,e.getMessage());
                 return null;
             }
-            if(e instanceof BadArgumentException){
+            if(e instanceof RuntimeException){
                 log.info("searchMultiError.BadArgumentException.noBizError.{}.{}",tenantId,e.getMessage());
                 return null;
             }
-            log.error("searchMultiError.{}.{}.{}.{}.{}", tenantId, JSONUtils.valueToString(searchBean)
-                    , JSONUtils.valueToString(pageRequest),JSONUtils.valueToString(order), e);
+            log.error("searchMultiError.{}.{}.{}.{}", tenantId, JSONObject.toJSONString(searchBean)
+                    , JSONObject.toJSONString(pageRequest),JSONObject.toJSONString(order), e);
             return null;
         }
 
@@ -173,21 +114,21 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
 
         returnPage.setTotalElements(totalCount);
         for (SearchHit searchHitFields : searchHits.getHits()) {
-            returnPage.getContent().add(JsonUtils.parseObject(searchHitFields.getSourceAsString(), getClassT()));
+            returnPage.getContent().add(JSONObject.parseObject(searchHitFields.getSourceAsString(), getClassT()));
         }
 
         return returnPage;
     }
 
-    private SearchRequestBuilder getSearchRequestBuilderBySwitch(Boolean isGoToJes) {
-        Client client = isGoToJes ? esTemplateForSix.getClient() : esTemplateForSix.getClient();
-        String indexReal = isGoToJes ? indexForSix : index;
-        String typeReal = isGoToJes ? typeForSix : type;
+    private SearchRequestBuilder getSearchRequestBuilderBySwitch() {
+        Client client = elasticSearchTemplate.getClient();
+        String indexReal = index;
+        String typeReal =  type;
         return client.prepareSearch(indexReal).setTypes(typeReal);
     }
 
     @Override
-    public Page<T> searchFiled(Long tenantId, S searchBean, PageRequest pageRequest, boolean isGoToJes) {
+    public Page<T> searchFiled(Long tenantId, S searchBean, PageRequest pageRequest) {
 
         Page<T> returnPage = new Page<>();
         returnPage.setPage(pageRequest.getPage());
@@ -201,10 +142,10 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
 
         // 控制分页深度
         if (from + pageRequest.getPageSize() > DEFAULT_PAGE_MAX_DEEP) {
-            throw new BadArgumentException("最多查询[" + DEFAULT_PAGE_MAX_DEEP + "]条数据，请增加查询条件过滤结果集");
+            throw new RuntimeException ("最多查询[" + DEFAULT_PAGE_MAX_DEEP + "]条数据，请增加查询条件过滤结果集");
         }
 
-        SearchRequestBuilder srb = getSearchRequestBuilderBySwitch(isGoToJes)
+        SearchRequestBuilder srb = getSearchRequestBuilderBySwitch()
                 .setFrom(from)
                 .setSize(pageRequest.getPageSize())
                 .setCollapse(new CollapseBuilder("skuIdskuName"))
@@ -220,21 +161,13 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
 
         returnPage.setTotalElements(totalCount.intValue());
         for (SearchHit searchHitFields : searchHits.getHits()) {
-            returnPage.getContent().add(JsonUtils.parseObject(searchHitFields.getSourceAsString(), getClassT()));
+            returnPage.getContent().add(JSONObject.parseObject(searchHitFields.getSourceAsString(), getClassT()));
         }
 
         return returnPage;
     }
 
-    public Page<T> searchFiled(Long tenantId, S searchBean, PageRequest pageRequest, TemplateRouteRequest sceneRequest) {
-        try {
-            return searchFiled(tenantId, searchBean, pageRequest, true);
-        } catch (Exception e) {
-            log.error("searchFiledRouteError.{}.{}.{}.{}.{}", tenantId, JSONUtils.valueToString(searchBean)
-                    , JSONUtils.valueToString(pageRequest),JSONUtils.valueToString(sceneRequest), e);
-            return null;
-        }
-    }
+   
 
     private List<Map<String, String>> getFlatBucket(int layer, Terms.Bucket bucket, String... groupColumnsNames) {
         ArrayListMultimap<BucketNode, BucketNode> bucketRowMultimap = ArrayListMultimap.create();
@@ -307,14 +240,14 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
     }
 
     @Override
-    public ScrollPage<T> scrollSearch(Long tenantId, S searchBean, ScrollPageRequest scrollPageRequest,Boolean isGoToJes) {
+    public ScrollPage<T> scrollSearch(Long tenantId, S searchBean, ScrollPageRequest scrollPageRequest) {
         ScrollPage<T> returnPage = new ScrollPage<T>();
         returnPage.setSize(scrollPageRequest.getPageSize());
         SearchResponse scrollResp;
 
         // 没有ScrollId  说明是首次请求
         if (StringUtils.isBlank(scrollPageRequest.getScrollId())) {
-            SearchRequestBuilder srb = getSearchRequestBuilderBySwitch(isGoToJes)
+            SearchRequestBuilder srb = getSearchRequestBuilderBySwitch()
                     .addSort(FieldSortBuilder.DOC_FIELD_NAME, SortOrder.ASC)
                     .setScroll(new TimeValue(scrollPageRequest.getScrollSeconds() * 1000))
                     .setQuery(getQueryBuilder(searchBean))
@@ -327,7 +260,7 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
         }
         // 使用ScrollId获取剩余的数据
         else {
-            scrollResp = (isGoToJes?esTemplateForSix.getClient():esTemplateForSix.getClient())
+            scrollResp = (elasticSearchTemplate.getClient())
                     .prepareSearchScroll(scrollPageRequest.getScrollId())
                     .setScroll(new TimeValue(scrollPageRequest.getScrollSeconds() * 1000))
                     .execute()
@@ -341,7 +274,7 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
         }
         returnPage.setTotalElements((int) totalCount);
         for (SearchHit searchHitFields : searchHits.getHits()) {
-            returnPage.getContent().add(JsonUtils.parseObject(searchHitFields.getSourceAsString(), getClassT()));
+            returnPage.getContent().add(JSONObject.parseObject(searchHitFields.getSourceAsString(), getClassT()));
         }
         returnPage.setScrollId(scrollResp.getScrollId());
         return returnPage;
@@ -355,7 +288,7 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
 
         Integer scrollTime = 60000;
         Integer scrollSize = 100;
-        SearchRequestBuilder srb = esTemplateForSix.getClient()
+        SearchRequestBuilder srb = elasticSearchTemplate.getClient()
                 .prepareSearch(index)
                 .addSort(FieldSortBuilder.DOC_FIELD_NAME, SortOrder.ASC)
                 .setTypes(type)
@@ -381,7 +314,7 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
                 }
             }
 
-            scrollResp = esTemplateForSix.getClient()
+            scrollResp = elasticSearchTemplate.getClient()
                     .prepareSearchScroll(scrollResp.getScrollId())
                     .setScroll(new TimeValue(scrollTime))
                     .execute()
@@ -455,7 +388,7 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
     @Override
     public void deleteByRoute(Long tenantId, String id, String route) {
 
-        esTemplateForSix.getClient()
+        elasticSearchTemplate.getClient()
                 .prepareDelete(indexForSix, typeForSix, id)
                 .setRouting(route)
                 .get();
@@ -464,7 +397,7 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
     @Override
     public void deleteByRoute(Long tenantId, String id, String parentId, String route) {
 
-        esTemplateForSix.getClient()
+        elasticSearchTemplate.getClient()
                 .prepareDelete(indexForSix, typeForSix, id)
                 .setParent(parentId)
                 .setRouting(route)
@@ -479,14 +412,14 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
     @Override
     public T getById(Long tenantId, String id, String route) {
 
-        GetResponse response = esTemplateForSix.getClient()
+        GetResponse response = elasticSearchTemplate.getClient()
                 .prepareGet(indexForSix, typeForSix, id)
                 .setRouting(route)
                 .setFetchSource(true)
                 .execute()
                 .actionGet();
 
-        return JsonUtils.parseObject(JsonUtils.toJSONString(response.getSource()), getClassT());
+        return JSONObject.parseObject(JSONObject.toJSONString(response.getSource()), getClassT());
     }
 
     @Override
@@ -498,17 +431,17 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
                     .routing(route)
                     .id(String.valueOf(id))
                     .retryOnConflict(3)
-                    .doc(JsonUtils.toJSONString(indexBean))
+                    .doc(JSONObject.toJSONString(indexBean))
                     .docAsUpsert(true);
-            UpdateResponse updateResponse = esTemplateForSix.getClient().update(updateRequest).get();
+            UpdateResponse updateResponse = elasticSearchTemplate.getClient().update(updateRequest).get();
             log.info("updateById, res updateResponse:" + JSON.toJSONString(updateResponse));
             if (!(updateResponse != null && updateResponse.getShardInfo() != null && updateResponse.getShardInfo().getFailed() == 0)) {
                 log.error("updateById, ex indexBean:" + JSON.toJSONString(indexBean) + "  updateResponse:" + JSON.toJSONString(updateResponse));
-                throw new SystemException("updateById 更新异常");
+                throw new RuntimeException ("updateById 更新异常");
             }
         } catch (Exception e) {
             log.error("updateById, ex indexBean:" + JSON.toJSONString(indexBean), e);
-            throw new SystemException(e);
+            throw new RuntimeException (e);
         }
     }
 
@@ -530,8 +463,8 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
 
 
 
-    public void setEsTemplateForSix(ESTemplate elasticsearchTemplate) {
-        this.esTemplateForSix = elasticsearchTemplate;
+    public void setElasticSearchTemplate(ElasticSearchTemplate elasticsearchTemplate) {
+        this.elasticSearchTemplate = elasticsearchTemplate;
     }
 
     /**
@@ -569,7 +502,7 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
 
         Class tmp = getClass();
         Class clz = tmp;
-        while (tmp != EsAbstractIndexService.class) {
+        while (tmp != TransportSearchIndexService.class) {
             clz = tmp;
             tmp = clz.getSuperclass();
         }
@@ -596,24 +529,7 @@ public abstract class EsAbstractIndexService<S, T> implements IndexService<S, T>
         return OrderBy.OrderByType.desc.name().equals(orderBy.getType()) ? SortOrder.DESC : SortOrder.ASC;
     }
 
-    private static String getInvokeApp() {
-        try {
-            String appId = (String) RpcContext.getContext().getAttachment(Constants.HIDDEN_KEY_APPID);
-            String appName = (String) RpcContext.getContext().getAttachment(Constants.HIDDEN_KEY_APPNAME);
-            String ip = RpcContext.getContext().getRemoteHostName();
+  
 
-            return Optional.ofNullable(appId).orElse("") + "-" + Optional.ofNullable(appName).orElse("")
-                    + "-" + Optional.ofNullable(ip).orElse("");
-        } catch (Exception e) {
-            return "";
-        }
-    }
 
-    public void setIndexForSix(String indexForSix) {
-        this.indexForSix = indexForSix;
-    }
-
-    public void setTypeForSix(String typeForSix) {
-        this.typeForSix = typeForSix;
-    }
 }

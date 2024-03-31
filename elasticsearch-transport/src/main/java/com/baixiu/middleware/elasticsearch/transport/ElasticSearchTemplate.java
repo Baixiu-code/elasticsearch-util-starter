@@ -1,6 +1,5 @@
-package com.jd.rd.product.infrastructure.es;
+package com.baixiu.middleware.elasticsearch.transport;
 
-import com.jd.rc.core.trade.product.api.common.exception.SystemException;
 import org.apache.commons.lang.StringUtils;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.settings.Settings;
@@ -15,13 +14,10 @@ import java.util.Arrays;
 import java.util.Base64;
 
 /**
- * @Package: com.jd.rd.product.infrastructure.es
- * @ClassName: ElasticsearchTemplate
- * @Author: ext.yinbo
- * @CreateTime: 2022/3/31 18:23
- * @Description:
+ * @author baixiu
+ * @date 2024年03月30日
  */
-public class ESTemplate {
+public class ElasticSearchTemplate {
     private String clusterNodes;
     private String clusterName;
     private Boolean clientTransportSniff;
@@ -38,7 +34,7 @@ public class ESTemplate {
                 .build();
 
         if (StringUtils.isBlank(clusterNodes)) {
-            throw new SystemException("clusterNodes is empty.");
+            throw new RuntimeException ("clusterNodes is empty.");
         }
 
         //创建集群client并添加集群节点地址
@@ -51,14 +47,13 @@ public class ESTemplate {
                 transportClient.addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(host[0]), Integer.parseInt(host[1])));
             }
         } catch (Exception e) {
-            throw new SystemException("ElasticsearchTemplate init error", e);
+            throw new RuntimeException ("ElasticsearchTemplate init error", e);
         }
         client = transportClient;
     }
 
     /**
      * 基础的base64生成
-     *
      * @param username 用户名
      * @param passwd   密码
      * @return 加密后的用户名和密码
