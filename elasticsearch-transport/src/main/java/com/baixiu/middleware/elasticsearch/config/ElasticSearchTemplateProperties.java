@@ -2,13 +2,14 @@ package com.baixiu.middleware.elasticsearch.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
 
 /**
  * es template config 
  * @author chenfanglin1
  * @date 创建时间 2024/4/1 10:52 AM
  */
-@ConfigurationProperties(prefix = "es.client.cluster.properties")
+@ConfigurationProperties(prefix = "es.client.cluster")
 @Data
 public class ElasticSearchTemplateProperties {
 

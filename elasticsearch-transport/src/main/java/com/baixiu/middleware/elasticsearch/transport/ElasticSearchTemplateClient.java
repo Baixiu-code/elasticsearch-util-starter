@@ -6,6 +6,8 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.transport.client.PreBuiltTransportClient;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import javax.annotation.PreDestroy;
 import javax.annotation.Resource;
 import java.net.InetAddress;
@@ -24,12 +26,15 @@ public class ElasticSearchTemplateClient {
 
     private static final String AUTH_KEY = "request.headers.Authorization";
     
-    @Resource
     private ElasticSearchTemplateProperties elasticSearchTemplateProperties;
 
     private Client client;
-    
-    
+
+    public ElasticSearchTemplateClient(ElasticSearchTemplateProperties elasticSearchTemplateProperties) {
+        this.elasticSearchTemplateProperties=elasticSearchTemplateProperties;
+    }
+
+
     public void init() {
         Settings settings = Settings.builder()
                 .put("cluster.name", elasticSearchTemplateProperties.getClusterName())
@@ -45,7 +50,7 @@ public class ElasticSearchTemplateClient {
         PreBuiltTransportClient transportClient = new PreBuiltTransportClient(settings);
 
         try {
-            String[] nodes = elasticSearchTemplateProperties.getClusterNodes().split(",");
+            String[] nodes = elasticSearchTemplateProperties.getClusterNodes().split(";");
             for (String node : nodes) {
                 String[] host = node.split(":");
                 transportClient.addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(host[0])

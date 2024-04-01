@@ -18,6 +18,7 @@ import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
@@ -26,6 +27,7 @@ import org.elasticsearch.search.collapse.CollapseBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
+import org.springframework.stereotype.Component;
 import java.lang.reflect.ParameterizedType;
 import java.math.BigDecimal;
 import java.util.*;
@@ -36,6 +38,7 @@ import java.util.stream.Collectors;
  * @author migration
  * @date  2020/11/12
  */
+@Component
 @Slf4j
 public abstract class AbstractTransportSearchIndexService<S, T> implements TransportSearchIndexService<S, T> {
 
@@ -46,8 +49,6 @@ public abstract class AbstractTransportSearchIndexService<S, T> implements Trans
     private String type;
 
     private ElasticSearchTemplateClient elasticSearchTemplate;
-
-   
 
    
 
@@ -364,15 +365,14 @@ public abstract class AbstractTransportSearchIndexService<S, T> implements Trans
      */
     public void indexByRoute(String id, Object source, String parent, String route) {
 
-        /*elasticsearchTemplate.getClient()
+        elasticSearchTemplate.getClient()
                 .prepareIndex(index, type, id)
-                .setParent(parent)
                 .setRouting(route)
-                .setSource(JsonUtils.toJSONString(source), XContentType.JSON)
+                .setSource(JSONObject.toJSONString(source), XContentType.JSON)
                 .execute()
-                .actionGet();*/
+                .actionGet();
     }
-
+    
     @Override
     public void delete(Long tenantId, String id) {
         deleteByRoute(tenantId, id, null);
