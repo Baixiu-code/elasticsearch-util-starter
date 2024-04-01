@@ -1,11 +1,13 @@
 package com.baixiu.middleware.elasticsearch.transport;
 
+import com.baixiu.middleware.elasticsearch.config.ElasticSearchTemplateProperties;
 import org.apache.commons.lang.StringUtils;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.transport.client.PreBuiltTransportClient;
 import javax.annotation.PreDestroy;
+import javax.annotation.Resource;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -14,26 +16,28 @@ import java.util.Arrays;
 import java.util.Base64;
 
 /**
+ * es template tcp transport client 
  * @author baixiu
  * @date 2024年03月30日
  */
-public class ElasticSearchTemplate {
-    private String clusterNodes;
-    private String clusterName;
-    private Boolean clientTransportSniff;
-    private Client client;
-    private static final String AUTH_KEY = "request.headers.Authorization";
-    private String username;
-    private String password;
+public class ElasticSearchTemplateClient {
 
+    private static final String AUTH_KEY = "request.headers.Authorization";
+    
+    @Resource
+    private ElasticSearchTemplateProperties elasticSearchTemplateProperties;
+
+    private Client client;
+    
+    
     public void init() {
         Settings settings = Settings.builder()
-                .put("cluster.name", clusterName)
-                .put("client.transport.sniff", clientTransportSniff)
-                .put(AUTH_KEY, basicAuthHeaderValue(username, password))
+                .put("cluster.name", elasticSearchTemplateProperties.getClusterName())
+                .put("client.transport.sniff", elasticSearchTemplateProperties.getClientTransportSniff())
+                .put(AUTH_KEY, basicAuthHeaderValue(elasticSearchTemplateProperties.getUsername(),elasticSearchTemplateProperties.getPassword()))
                 .build();
 
-        if (StringUtils.isBlank(clusterNodes)) {
+        if (StringUtils.isBlank(elasticSearchTemplateProperties.getClusterNodes())) {
             throw new RuntimeException ("clusterNodes is empty.");
         }
 
@@ -41,10 +45,11 @@ public class ElasticSearchTemplate {
         PreBuiltTransportClient transportClient = new PreBuiltTransportClient(settings);
 
         try {
-            String[] nodes = clusterNodes.split(",");
+            String[] nodes = elasticSearchTemplateProperties.getClusterNodes().split(",");
             for (String node : nodes) {
                 String[] host = node.split(":");
-                transportClient.addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(host[0]), Integer.parseInt(host[1])));
+                transportClient.addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(host[0])
+                        , Integer.parseInt(host[1])));
             }
         } catch (Exception e) {
             throw new RuntimeException ("ElasticsearchTemplate init error", e);
@@ -84,7 +89,7 @@ public class ElasticSearchTemplate {
     }
 
     @PreDestroy
-    public void destory(){
+    public void destroy(){
         client.close();
     }
 
@@ -92,23 +97,5 @@ public class ElasticSearchTemplate {
         return client;
     }
 
-    public void setClusterNodes(String clusterNodes) {
-        this.clusterNodes = clusterNodes;
-    }
-
-    public void setClusterName(String clusterName) {
-        this.clusterName = clusterName;
-    }
-
-    public void setClientTransportSniff(Boolean clientTransportSniff) {
-        this.clientTransportSniff = clientTransportSniff;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
-    }
+    
 }

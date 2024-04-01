@@ -4,7 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.baixiu.middleware.elasticsearch.order.OrderBy;
 import com.baixiu.middleware.elasticsearch.page.*;
-import com.baixiu.middleware.elasticsearch.transport.ElasticSearchTemplate;
+import com.baixiu.middleware.elasticsearch.transport.ElasticSearchTemplateClient;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -43,11 +43,9 @@ public abstract class AbstractTransportSearchIndexService<S, T> implements Trans
     public static final int DEFAULT_PAGE_MAX_DEEP = 10000;
 
     private String index;
-    private String indexForSix;
-    private String typeForSix;
     private String type;
 
-    private ElasticSearchTemplate elasticSearchTemplate;
+    private ElasticSearchTemplateClient elasticSearchTemplate;
 
    
 
@@ -389,7 +387,7 @@ public abstract class AbstractTransportSearchIndexService<S, T> implements Trans
     public void deleteByRoute(Long tenantId, String id, String route) {
 
         elasticSearchTemplate.getClient()
-                .prepareDelete(indexForSix, typeForSix, id)
+                .prepareDelete(index, type, id)
                 .setRouting(route)
                 .get();
     }
@@ -398,7 +396,7 @@ public abstract class AbstractTransportSearchIndexService<S, T> implements Trans
     public void deleteByRoute(Long tenantId, String id, String parentId, String route) {
 
         elasticSearchTemplate.getClient()
-                .prepareDelete(indexForSix, typeForSix, id)
+                .prepareDelete(index, type, id)
                 .setParent(parentId)
                 .setRouting(route)
                 .get();
@@ -413,7 +411,7 @@ public abstract class AbstractTransportSearchIndexService<S, T> implements Trans
     public T getById(Long tenantId, String id, String route) {
 
         GetResponse response = elasticSearchTemplate.getClient()
-                .prepareGet(indexForSix, typeForSix, id)
+                .prepareGet(index, type, id)
                 .setRouting(route)
                 .setFetchSource(true)
                 .execute()
@@ -426,8 +424,8 @@ public abstract class AbstractTransportSearchIndexService<S, T> implements Trans
     public void updateByRouteId(Long tenantId, String id, String route, T indexBean) {
         try {
             UpdateRequest updateRequest = new UpdateRequest()
-                    .index(indexForSix)
-                    .type(typeForSix)
+                    .index(index)
+                    .type(type)
                     .routing(route)
                     .id(String.valueOf(id))
                     .retryOnConflict(3)
@@ -463,7 +461,7 @@ public abstract class AbstractTransportSearchIndexService<S, T> implements Trans
 
 
 
-    public void setElasticSearchTemplate(ElasticSearchTemplate elasticsearchTemplate) {
+    public void setElasticSearchTemplate(ElasticSearchTemplateClient elasticsearchTemplate) {
         this.elasticSearchTemplate = elasticsearchTemplate;
     }
 
@@ -513,7 +511,9 @@ public abstract class AbstractTransportSearchIndexService<S, T> implements Trans
     public Map<String, JoinLogic.LogicType> convertLogicList2Map(List<JoinLogic> logicList) {
 
         Map<String, JoinLogic.LogicType> map = Maps.newHashMap();
-        if (logicList == null) return map;
+        if (logicList == null) {
+            return map;
+        }
 
         for (JoinLogic joinLogic : logicList) {
             map.put(joinLogic.getField(), JoinLogic.LogicType.valueOf(joinLogic.getType()));
