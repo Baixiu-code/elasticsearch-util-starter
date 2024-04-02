@@ -498,11 +498,15 @@ public abstract class AbstractTransportSearchIndexService<S, T> implements Trans
     }
 
 
+    /**
+     * 通过当前查询的index bean 查询当前index 传入的泛型类
+     * @return 传入的泛型类
+     */
     private Class<T> getClassT() {
 
         Class tmp = getClass();
         Class clz = tmp;
-        while (tmp != TransportSearchIndexService.class) {
+        while (tmp != AbstractTransportSearchIndexService.class) {
             clz = tmp;
             tmp = clz.getSuperclass();
         }
